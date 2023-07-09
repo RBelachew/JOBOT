@@ -1,0 +1,1801 @@
+/******/ (() => { // webpackBootstrap
+/******/ 	var __webpack_modules__ = ({
+
+/***/ 244:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports.EventType = exports.Event = void 0;
+class EventLogger {
+  constructor() {
+    this.events = [];
+  }
+  logEvent(event) {
+    this.events.push(event);
+  }
+  debug(message) {
+    this.logEvent(new Event(EventType.DEBUG, message));
+  }
+  info(message) {
+    this.logEvent(new Event(EventType.INFO, message));
+  }
+  warn(message) {
+    this.logEvent(new Event(EventType.WARN, message));
+  }
+  error(message) {
+    this.logEvent(new Event(EventType.ERROR, message));
+  }
+}
+exports["default"] = EventLogger;
+class Event {
+  constructor(eventType, message) {
+    this.eventType = EventType[eventType];
+    this.message = message;
+  }
+}
+exports.Event = Event;
+var EventType;
+(function (EventType) {
+  EventType[EventType["DEBUG"] = 0] = "DEBUG";
+  EventType[EventType["INFO"] = 1] = "INFO";
+  EventType[EventType["WARN"] = 2] = "WARN";
+  EventType[EventType["ERROR"] = 3] = "ERROR";
+})(EventType = exports.EventType || (exports.EventType = {}));
+
+/***/ }),
+
+/***/ 210:
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var __awaiter = this && this.__awaiter || function (thisArg, _arguments, P, generator) {
+  function adopt(value) {
+    return value instanceof P ? value : new P(function (resolve) {
+      resolve(value);
+    });
+  }
+  return new (P || (P = Promise))(function (resolve, reject) {
+    function fulfilled(value) {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    }
+    function rejected(value) {
+      try {
+        step(generator["throw"](value));
+      } catch (e) {
+        reject(e);
+      }
+    }
+    function step(result) {
+      result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+    }
+    step((generator = generator.apply(thisArg, _arguments || [])).next());
+  });
+};
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+const TagObject_1 = __importDefault(__webpack_require__(5650));
+const constants_1 = __webpack_require__(7504);
+const fetchUtils_1 = __webpack_require__(2061);
+const publisherFunctions_1 = __webpack_require__(2604);
+// This is needed for async await generated code by babel-plugin-transform-async-to-generator.
+// Otherwise, it'll throw 'Uncaught ReferenceError: regeneratorRuntime is not defined' when calling the functions
+__webpack_require__(5666);
+class IndeedCreativeTagObject extends TagObject_1.default {
+  constructor() {
+    super("https://pres.indeed.com", fetchUtils_1.fetchParamsBrandedLogging, fetchUtils_1.fetchOptionsBrandedLogging);
+    this.loggingEndpoint = 'ita/v1/logs/brandedAd';
+    this.logCreativeSeen = this.logFunc(this.loggingEndpoint, {
+      logtype: 'imp'
+    });
+    this.logCreativeClosed = this.logFunc(this.loggingEndpoint, {
+      logtype: 'closed'
+    });
+    this.logCreativeClick = this.logFunc(this.loggingEndpoint, {
+      logtype: 'clk'
+    });
+    this.logHiddenCreative = this.logFunc(this.loggingEndpoint, {
+      logtype: 'imp',
+      logLabel: 'hiddenITABrandedAd'
+    });
+  }
+  start() {
+    const creativeTags = Array.from(document.body.querySelectorAll(`[data-tag-type='creative'][data-load-status=${constants_1.NOTLOADED}]`));
+    creativeTags.forEach(creativeTagElement => __awaiter(this, void 0, void 0, function* () {
+      creativeTagElement.dataset.loadStatus = constants_1.LOADING;
+      // Check if experiment hiddenITABrandedAd is active
+      if (creativeTagElement.dataset.isHidden === 'true') {
+        this.registerElementForSeenCheck(creativeTagElement);
+        creativeTagElement.dataset.loadStatus = constants_1.NOTLOADED;
+        this.checkForElementsInViewport();
+      } else {
+        // Create the fetchParamsString
+        const creativeKey = creativeTagElement.dataset.creativeKey;
+        const fetchParamsString = (0, fetchUtils_1.createFetchParamsString)(creativeTagElement, fetchUtils_1.fetchParamsBranded);
+        // Do fetch call to presentation server
+        yield this.fetchFromPresentationWebapp(creativeTagElement, fetchParamsString, creativeKey);
+      }
+    }));
+  }
+  /**
+   * Do fetch to presentation-webapp server
+   *
+   * @param {HTMLElement} creativeTag Creative tag div that needs creative HTML
+   * @param {string[]} fetchParamsString Stringified parameters for fetch
+   * @param {string} creativeKey Optional parameter that specifies a creative key
+   */
+  fetchFromPresentationWebapp(creativeTag, fetchParamsString, creativeKey) {
+    return __awaiter(this, void 0, void 0, function* () {
+      if (creativeKey === undefined) {
+        throw new Error('Creative key is undefined');
+      }
+      const fetchURL = this.getPresentationWebappFetchURL(`ita/v1/creative/${creativeKey}/`, fetchParamsString);
+      const pubTag = creativeTag.closest('[data-tag-type=publisher]');
+      let syntheticEvent = (0, publisherFunctions_1.createIndeedAdNotLoadEvent)();
+      try {
+        const response = yield fetch(fetchURL);
+        this.logger.debug(response);
+        if (!response.ok) {
+          throw new Error(`Response isn't in the range 200-299: ${response.status}`);
+        }
+        const creativeHTMLString = yield response.text();
+        if (creativeHTMLString.length === 0) {
+          // If response is empty
+          creativeTag.dataset.tagReason = constants_1.NO_CREATIVE_RETURNED;
+          this.logger.info(constants_1.NO_CREATIVE_RETURNED);
+        } else {
+          // We have a response
+          this.logger.debug(creativeHTMLString);
+          if (creativeTag.dataset.flowPage === 'glassdoor' && creativeTag.dataset.flowType === 'brand-spotlight') {
+            // Create iframe for Brand Spotlight
+            this.addIframeToDOM(creativeTag, creativeHTMLString, creativeKey, fetchURL);
+          } else {
+            this.addCreativeToDOM(creativeTag, creativeHTMLString);
+            this.setDataAttribute(creativeTag, 'creative-variant-id');
+            this.setDataAttribute(creativeTag, 'format');
+            this.attachLoggingHandlers(creativeTag);
+            this.checkForElementsInViewport();
+            creativeTag.dataset.loadStatus = constants_1.LOADED;
+          }
+          syntheticEvent = (0, publisherFunctions_1.createIndeedAdLoadEvent)();
+        }
+      } catch (error) {
+        creativeTag.dataset.loadStatus = constants_1.NOTLOADED;
+        const networkError = new Error(`A network failure or something prevented the request from completing: ${error}`);
+        this.logger.error(networkError);
+      } finally {
+        pubTag === null || pubTag === void 0 ? void 0 : pubTag.dispatchEvent(syntheticEvent);
+      }
+    });
+  }
+  addIframeToDOM(creativeTag, creativeString, creativeKey, fetchURL) {
+    const flowType = creativeTag.dataset.flowType;
+    const dimensions = new Map();
+    dimensions.set(flowType, {
+      width: '300',
+      height: '250'
+    });
+    const theIframe = document.createElement('iframe');
+    // Here we add html escaping double quotes with text.replace() in order to have srcdoc working
+    const iframeSrcDoc = `<script>let creativeKeyFromDAT= '${creativeKey}'</script>` + creativeString;
+    // If the parent page has loaded then set the iframe src
+    if (window.__IPT__.windowLoaded) {
+      theIframe.srcdoc = iframeSrcDoc;
+      theIframe.src = fetchURL;
+    } else {
+      // The parent page has not loaded, so wait for the load event to set the src to prevent blocking parent page load
+      window.addEventListener('load', () => {
+        theIframe.srcdoc = iframeSrcDoc;
+        theIframe.src = fetchURL;
+      }, false);
+    }
+    theIframe.setAttribute('width', dimensions.get(flowType).width);
+    theIframe.setAttribute('height', dimensions.get(flowType).height);
+    theIframe.setAttribute('title', 'Third party creative content');
+    theIframe.setAttribute('frameborder', '0');
+    theIframe.setAttribute('scrolling', 'no');
+    creativeTag.appendChild(theIframe);
+  }
+  /**
+   * Look if element's children has data-xxx.
+   * And if it has, adding it to element's dataset.
+   *
+   * @param {HTMLElement} element Element to add new value to
+   * @param {string} fieldName Data attribute name to search for and pull the value from
+   */
+  setDataAttribute(element, fieldName) {
+    const articleEl = element.querySelector(`[data-${fieldName}]`);
+    if (articleEl) {
+      const camelFieldName = fieldName.replace(/-([a-z]?)/g, (m, g) => g.toUpperCase());
+      const fieldValue = articleEl.dataset[camelFieldName];
+      if (fieldValue && !element.dataset[camelFieldName]) {
+        element.dataset[camelFieldName] = fieldValue;
+      }
+    }
+  }
+  attachLoggingHandlers(creativeElement) {
+    const closeButton = creativeElement.querySelector("button[aria-label='Close']");
+    // Register element to check for seen event
+    this.registerElementForSeenCheck(creativeElement);
+    // Close button handler
+    closeButton === null || closeButton === void 0 ? void 0 : closeButton.addEventListener('click', this.creativeCloseHandler.bind(this), false);
+    // Creative click handler
+    creativeElement.addEventListener('click', this.creativeClickHandler.bind(this), false);
+  }
+  creativeClickHandler(event) {
+    const target = event.target;
+    const creativeTagElement = target.closest('[data-tag-type="creative"]');
+    if (creativeTagElement) {
+      this.logCreativeClick(creativeTagElement);
+    }
+  }
+  creativeCloseHandler(event) {
+    const target = event.target;
+    const creativeTagElement = target.closest('[data-tag-type="creative"]');
+    if (creativeTagElement) {
+      this.logCreativeClosed(creativeTagElement);
+      const closeButton = creativeTagElement.querySelector("button[aria-label='Close']");
+      if (closeButton) {
+        closeButton.removeEventListener('click', this.creativeCloseHandler.bind(this), false);
+      }
+      creativeTagElement.removeEventListener('click', this.creativeClickHandler.bind(this), false);
+      this.unregisterElementForSeenCheck(creativeTagElement);
+      this.removeCreative(creativeTagElement);
+    }
+    event.stopPropagation();
+  }
+  removeCreative(creativeTagElement) {
+    creativeTagElement.remove();
+  }
+  onSuccessSeen(element) {
+    if (element.dataset.isHidden === 'true') {
+      this.logHiddenCreative(element);
+    } else {
+      this.logCreativeSeen(element);
+    }
+  }
+}
+exports["default"] = IndeedCreativeTagObject;
+
+/***/ }),
+
+/***/ 1087:
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var __awaiter = this && this.__awaiter || function (thisArg, _arguments, P, generator) {
+  function adopt(value) {
+    return value instanceof P ? value : new P(function (resolve) {
+      resolve(value);
+    });
+  }
+  return new (P || (P = Promise))(function (resolve, reject) {
+    function fulfilled(value) {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    }
+    function rejected(value) {
+      try {
+        step(generator["throw"](value));
+      } catch (e) {
+        reject(e);
+      }
+    }
+    function step(result) {
+      result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+    }
+    step((generator = generator.apply(thisArg, _arguments || [])).next());
+  });
+};
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+const EventLogger_1 = __importDefault(__webpack_require__(244));
+const constants_1 = __webpack_require__(7504);
+const createCreativeTag_1 = __webpack_require__(3236);
+const fetchUtils_1 = __webpack_require__(2061);
+const publisherFunctions_1 = __webpack_require__(2604);
+const setTagReason_1 = __webpack_require__(1345);
+const typesAndInterfaces_1 = __webpack_require__(9388);
+// This is needed for async await generated code by babel-plugin-transform-async-to-generator.
+// Otherwise, it'll throw 'Uncaught ReferenceError: regeneratorRuntime is not defined' when calling the functions
+__webpack_require__(5666);
+class IndeedPublisherTagObject {
+  get windowLoaded() {
+    return this._windowLoaded;
+  }
+  set windowLoaded(value) {
+    this._windowLoaded = value;
+  }
+  constructor() {
+    this._windowLoaded = false;
+    this.logger = new EventLogger_1.default();
+  }
+  start() {
+    var _a;
+    (_a = this.getPublisherTags()) === null || _a === void 0 ? void 0 : _a.forEach(publisherTag => __awaiter(this, void 0, void 0, function* () {
+      if (publisherTag.tags.length > 0) {
+        try {
+          yield this.getCreatives(publisherTag);
+        } catch (e) {
+          this.logger.debug(`Error: ${e}`);
+        }
+      }
+    }));
+  }
+  getCreatives(publisherTag) {
+    return __awaiter(this, void 0, void 0, function* () {
+      const tags = publisherTag.tags;
+      // Check to see if the url has the forcedAdId param
+      const params = new URLSearchParams(document.location.search.substring(1));
+      (0, publisherFunctions_1.setForcedId)(tags, params);
+      // Do asynchronous requests to ITAD and save publisher tags and promises in a map
+      this.fetchFromITAD(publisherTag);
+      // Wait for all promises to resolve
+      const arrayOfResults = yield Promise.all(publisherTag.responseMap.values()).catch(elements => elements === null || elements === void 0 ? void 0 : elements.forEach(e => e.dispatchEvent((0, publisherFunctions_1.createIndeedAdNotLoadEvent)())));
+      // Find the creativeKeys from the resolved promises and put it on the publisher tag as data attribute
+      arrayOfResults === null || arrayOfResults === void 0 ? void 0 : arrayOfResults.forEach((creativeResponse, index) => {
+        // Checking for empty response from ITAD
+        if (Object.keys(creativeResponse).length > 0) {
+          (0, publisherFunctions_1.trackCreativeKey)(creativeResponse, tags[index], publisherTag.creativeSet);
+        } else {
+          (0, setTagReason_1.setTagReason)(tags[index], constants_1.EMPTY_RESPONSE);
+          tags[index].dispatchEvent((0, publisherFunctions_1.createIndeedAdNotLoadEvent)());
+        }
+      });
+      // Create the creative tag and creative script to insert into the DOM
+      tags === null || tags === void 0 ? void 0 : tags.forEach(pubTag => {
+        const creativeData = pubTag.dataset.creativeData;
+        const hasUniqueCreativeKey = !pubTag.dataset.creativeKeyDuplicate;
+        if (hasUniqueCreativeKey && creativeData) {
+          (0, createCreativeTag_1.createCreativeTag)(pubTag, JSON.parse(creativeData), pubTag.dataset.forcedAdId);
+        }
+      });
+    });
+  }
+  fetchFromITAD(publisherTag) {
+    var _a;
+    (_a = publisherTag.tags) === null || _a === void 0 ? void 0 : _a.forEach(element => {
+      try {
+        (0, fetchUtils_1.checkForFlowPageAndFlowType)(element);
+        element.dataset.loadStatus = constants_1.LOADING;
+        const fetchParams = (0, fetchUtils_1.createFetchParamsString)(element, fetchUtils_1.fetchParamsITAD);
+        const publisherTagPromise = (0, fetchUtils_1.doFetchToItad)(fetchParams, element.dataset.forcedAdId);
+        publisherTag.responseMap.set(element, publisherTagPromise);
+      } catch (err) {
+        this.logger.debug(`${err}`);
+      }
+    });
+  }
+  getPublisherTags() {
+    return Object.values(typesAndInterfaces_1.FlowType).map(flowType => {
+      const tags = Array.from(document.body.querySelectorAll(`[data-tag-type='publisher']:not([data-load-status])[data-flow-type=${flowType}]`));
+      return {
+        flowType: flowType,
+        tags: tags,
+        responseMap: new Map(),
+        creativeSet: new Set()
+      };
+    }).filter(collection => collection.tags.length > 0);
+  }
+  hasPublisherTags() {
+    return this.getPublisherTags().length > 0;
+  }
+}
+exports["default"] = IndeedPublisherTagObject;
+
+/***/ }),
+
+/***/ 5650:
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+const EventLogger_1 = __importDefault(__webpack_require__(244));
+const fetchUtils_1 = __webpack_require__(2061);
+class TagObject {
+  constructor(presentationWebappBaseURL, loggingParamsObject, loggingFetchOptions) {
+    this.elementsToCheck = [];
+    this.ticking = false;
+    this.presentationWebappBaseURL = presentationWebappBaseURL || '';
+    this.pixelServerBaseURL = "https://pxl.indeed.com" || 0;
+    this.loggingParamsObject = loggingParamsObject;
+    this.loggingFetchOptions = loggingFetchOptions;
+    this.logger = new EventLogger_1.default();
+  }
+  setTicking(val) {
+    this.ticking = val;
+  }
+  isTicking() {
+    return this.ticking;
+  }
+  getElementsToCheck() {
+    return this.elementsToCheck;
+  }
+  getPresentationWebappFetchURL(creativeEndpoint, paramsString) {
+    return `${this.presentationWebappBaseURL}/${creativeEndpoint}?${paramsString}`;
+  }
+  getPixelServerFetchURL(loggingEndpoint, paramsString) {
+    return `${this.pixelServerBaseURL}/${loggingEndpoint}?${paramsString}`;
+  }
+  addCreativeToDOM(element, responseString) {
+    const rangeFragment = document.createRange().createContextualFragment(responseString);
+    element.appendChild(rangeFragment);
+  }
+  /**
+   * Returns a function to log the event specified by the logObject
+   *
+   * @param {string} loggingEndpoint the complete url before the parameters (same for all branded)
+   *      i.e. 'https://pxl.indeed.com/ita/v1/logs/brandedAd'
+   * @param {object} logObject? optional, to be used for creating params string for branded logging
+   *      i.e. { logtype: 'clk' } OR { logtype: 'imp', logLabel: 'hiddenITABrandedAd' }
+   * @returns {function}
+   */
+  logFunc(loggingEndpoint, logObject) {
+    return elem => {
+      const paramsString = (0, fetchUtils_1.createFetchParamsString)(elem, this.loggingParamsObject, logObject);
+      const fetchURL = this.getPixelServerFetchURL(loggingEndpoint, paramsString);
+      fetch(fetchURL, this.loggingFetchOptions).catch(error => this.logger.error(`Error, ${error}, encountered when trying to log.`));
+    };
+  }
+  /**
+   * Checks if the element is in the viewport
+   *
+   * @param {HTMLElement} element Element to check if completely in the viewport
+   * @returns {boolean} True if completely in viewport, false otherwise
+   */
+  isElementInViewport(element) {
+    const boundingRect = element.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    return boundingRect.top >= 0 && boundingRect.left >= 0 && boundingRect.bottom <= viewportHeight && boundingRect.right <= viewportWidth;
+  }
+  /**
+   * Check if the creative is in the viewport then logs the seen event
+   */
+  checkForElementsInViewport() {
+    if (this.elementsToCheck.length > 0) {
+      this.elementsToCheck.forEach(element => {
+        if (this.isElementInViewport(element)) {
+          this.onSuccessSeen(element);
+          this.unregisterElementForSeenCheck(element);
+        }
+      });
+    }
+  }
+  /**
+   * Adds a new creative to the elementsToCheck array in the specified tag object
+   *
+   * @param {HTMLElement} element Element to be registered for seen check and added to elementsToCheck array
+   */
+  registerElementForSeenCheck(element) {
+    this.elementsToCheck.push(element);
+  }
+  /**
+   * Removes a seen creative from the elementsToCheck array in the specified tag object
+   *
+   * @param {HTMLElement} element Element to be unregistered for seen check and removed from elementsToCheck array
+   */
+  unregisterElementForSeenCheck(element) {
+    this.elementsToCheck = this.elementsToCheck.filter(elem => elem !== element);
+  }
+}
+exports["default"] = TagObject;
+
+/***/ }),
+
+/***/ 7504:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports.SCROLL_DEBOUNCER_TIMEOUT = exports.NOTLOADED = exports.LOADING = exports.LOADED = exports.NO_CREATIVE_RETURNED = exports.FOUND_NO_SPONSORED_JOB_TAGS = exports.FOUND_NO_PUBLISHER_TAGS = exports.FOUND_NO_BEESWAX_EBA_TAGS = exports.COULD_NOT_CREATE_CREATIVE_TAG = exports.EMPTY_CREATIVE_DATA = exports.EMPTY_RESPONSE = void 0;
+exports.EMPTY_RESPONSE = 'Empty response from ITAD';
+exports.EMPTY_CREATIVE_DATA = 'Empty creative tag data';
+exports.COULD_NOT_CREATE_CREATIVE_TAG = 'Could not create creative tag';
+exports.FOUND_NO_BEESWAX_EBA_TAGS = 'Found no Beeswax EBA tags to process';
+exports.FOUND_NO_PUBLISHER_TAGS = 'Found no publisher tags to process';
+exports.FOUND_NO_SPONSORED_JOB_TAGS = 'Found no sponsored job tags to process';
+exports.NO_CREATIVE_RETURNED = 'No creative returned';
+exports.LOADED = 'loaded';
+exports.LOADING = 'loading';
+exports.NOTLOADED = 'notloaded';
+exports.SCROLL_DEBOUNCER_TIMEOUT = 50;
+
+/***/ }),
+
+/***/ 3236:
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports.createCreativeTag = void 0;
+const constants_1 = __webpack_require__(7504);
+function createCreativeTag(publisherTag, json, forcedAdIdNum) {
+  // Create the creative tag and set its params
+  const creativeTag = document.createElement('div');
+  creativeTag.dataset.tagType = json.tagType;
+  creativeTag.dataset.creativeKey = json.creativeKey;
+  creativeTag.dataset.fccKey = json.fccKey;
+  creativeTag.dataset.flowPage = json.flowPage;
+  creativeTag.dataset.flowType = json.flowType;
+  creativeTag.dataset.trigger = json.trigger;
+  creativeTag.dataset.elmntType = json.elmntType;
+  creativeTag.dataset.logLabel = json.logLabel;
+  creativeTag.dataset.mobtk = json.mobtk;
+  creativeTag.dataset.adtype = json.adtype;
+  creativeTag.dataset.loadStatus = constants_1.NOTLOADED;
+  const pubTagDataSet = publisherTag.dataset;
+  if (pubTagDataSet.isHidden) {
+    creativeTag.dataset.isHidden = pubTagDataSet.isHidden;
+  }
+  if (forcedAdIdNum) {
+    creativeTag.dataset.forcedAdId = forcedAdIdNum;
+  }
+  if (pubTagDataSet.gdCtk) {
+    creativeTag.dataset.gdCtk = pubTagDataSet.gdCtk;
+  }
+  // Create the creative script
+  const creativeScript = document.createElement('script');
+  creativeScript.async = true;
+  creativeScript.src = json.creativeScriptSrc;
+  creativeTag.appendChild(creativeScript);
+  publisherTag.appendChild(creativeTag);
+  publisherTag.dataset.loadStatus = constants_1.LOADED;
+}
+exports.createCreativeTag = createCreativeTag;
+
+/***/ }),
+
+/***/ 2061:
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var __awaiter = this && this.__awaiter || function (thisArg, _arguments, P, generator) {
+  function adopt(value) {
+    return value instanceof P ? value : new P(function (resolve) {
+      resolve(value);
+    });
+  }
+  return new (P || (P = Promise))(function (resolve, reject) {
+    function fulfilled(value) {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    }
+    function rejected(value) {
+      try {
+        step(generator["throw"](value));
+      } catch (e) {
+        reject(e);
+      }
+    }
+    function step(result) {
+      result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+    }
+    step((generator = generator.apply(thisArg, _arguments || [])).next());
+  });
+};
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports.fetchOptionsSponsoredJobLogging = exports.fetchParamsSponsoredJobLogging = exports.fetchParamsSponsoredJob = exports.fetchOptionsBeeswaxEBALogging = exports.fetchParamsBeeswaxEBALogging = exports.fetchParamsBeeswaxEBA = exports.fetchOptionsBrandedLogging = exports.fetchParamsBrandedLogging = exports.fetchParamsBranded = exports.fetchParamsITAD = exports.checkForFlowPageAndFlowType = exports.createFetchParamsString = exports.doFetchToItad = void 0;
+// This is needed for async await generated code by babel-plugin-transform-async-to-generator.
+// Otherwise, it'll throw 'Uncaught ReferenceError: regeneratorRuntime is not defined' when calling the functions
+__webpack_require__(5666);
+function doFetchToItad(fetchParamsString, forcedAdIdNum) {
+  return __awaiter(this, void 0, void 0, function* () {
+    let fetchURL;
+    if (forcedAdIdNum) {
+      fetchURL = `${"https://itad.indeed.com/ita/v1/publisher"}/${forcedAdIdNum}?${fetchParamsString}`;
+    } else {
+      fetchURL = `${"https://itad.indeed.com/ita/v1/publisher"}?${fetchParamsString}`;
+    }
+    const response = yield fetch(fetchURL, {
+      credentials: 'include'
+    });
+    if (!response.ok) {
+      throw new Error(`Response status is ${response.status}`);
+    }
+    const responseJson = yield response.json();
+    return responseJson;
+  });
+}
+exports.doFetchToItad = doFetchToItad;
+/**
+ * Creates a string of parameters to append to the fetch url
+ *
+ * @param {HTMLElement} tagElement
+ * @param { FetchParamsBranded | FetchParamsBrandedLogging | FetchParamsSponsoredJob | FetchParamsSponsoredJobLogging } paramsObject
+ *  object with the attribute in the HTML element as the key and the desired url param name as the value
+ *      i.e. same attribute name and param name: { flowPage: 'flowpage', flowType: 'flowType }
+ *       OR  different attribute name and param name: { dspAdId: 'adId', dspUserId: 'userId', dspEventId: 'eventId' }
+ * @param {object} logObject? optional, to be used for creating params string for branded logging
+ *      i.e. { logtype: 'clk' } OR { logtype: 'imp', logLabel: 'hiddenITABrandedAd' }
+ * @returns {string} that looks like "flowPage=mobapptrackersavedbottom&flowType=inline"
+ */
+function createFetchParamsString(tagElement, paramsObject, logObject) {
+  const tagDataSet = tagElement.dataset;
+  let paramsAndValues = {};
+  let paramsAndValuesKeys;
+  const paramKeys = Object.keys(paramsObject);
+  const validParamsArray = paramKeys.filter(param => tagDataSet[param]);
+  if (logObject) {
+    validParamsArray.forEach(param => {
+      paramsAndValues[param] = `${tagDataSet[param]}`;
+    });
+    paramsAndValues = Object.assign(paramsAndValues, logObject);
+    paramsAndValuesKeys = Object.keys(paramsAndValues);
+    return paramsAndValuesKeys.map(param => `${paramsObject[param] || param}=${paramsAndValues[param]}`).join('&');
+  } else {
+    return validParamsArray.map(param => `${paramsObject[param]}=${tagDataSet[param]}`).join('&');
+  }
+}
+exports.createFetchParamsString = createFetchParamsString;
+function checkForFlowPageAndFlowType(element) {
+  if (!(element.dataset.flowPage && element.dataset.flowType)) {
+    throw new Error('No data-flow-page or data-flow-type was detected');
+  }
+}
+exports.checkForFlowPageAndFlowType = checkForFlowPageAndFlowType;
+exports.fetchParamsITAD = {
+  flowPage: 'flowPage',
+  flowType: 'flowType',
+  gdCtk: 'gdCtk',
+  prforceGroups: 'prforceGroups'
+};
+exports.fetchParamsBranded = {
+  flowPage: 'flowPage',
+  flowType: 'flowType'
+};
+exports.fetchParamsBrandedLogging = {
+  adtype: 'adtype',
+  creativeKey: 'creativeKey',
+  creativeVariantId: 'creativeVariantId',
+  format: 'format',
+  elmntType: 'elmntType',
+  fccKey: 'fccKey',
+  flowPage: 'flowPage',
+  flowType: 'flowType',
+  gdCtk: 'gdCtk',
+  logLabel: 'logLabel',
+  mobtk: 'mobtk',
+  trigger: 'trigger'
+};
+exports.fetchOptionsBrandedLogging = {
+  method: 'POST',
+  credentials: 'include'
+};
+exports.fetchParamsBeeswaxEBA = {
+  creativeKey: 'creativeKey',
+  width: 'width',
+  height: 'height',
+  dspAdId: 'dspAdId',
+  dspEventId: 'eventId',
+  dspUserId: 'userId',
+  dspDomain: 'domain',
+  dspClickUrl: 'beeswaxClickUrl',
+  cacheBuster: 'cacheBuster'
+};
+exports.fetchParamsBeeswaxEBALogging = {
+  dspAdId: 'dspAdId',
+  dspDomain: 'domain',
+  dspEventId: 'dspEventId',
+  fccKey: 'fccKey',
+  creativeKey: 'creativeKey',
+  redirectUrl: 'redirectUrl',
+  dspUserId: 'dspUserId',
+  templateName: 'templateName',
+  cacheBuster: 'cacheBuster'
+};
+exports.fetchOptionsBeeswaxEBALogging = {
+  credentials: 'include'
+};
+exports.fetchParamsSponsoredJob = {
+  creativeId: 'creative_id',
+  width: 'width',
+  height: 'height',
+  dspAdId: 'adId',
+  dspEventId: 'eventId',
+  dspUserId: 'userId',
+  dspDomain: 'domain',
+  dspAppName: 'appName',
+  dspSiteName: 'siteName',
+  dspPage: 'page',
+  forcedJobKey: 'forcedJobKey',
+  forcedProctorGroups: 'prforceGroups',
+  dspCampaignId: 'campaignId',
+  indeedUserId: 'indeedUserId'
+};
+exports.fetchParamsSponsoredJobLogging = {
+  dspAdId: 'dspAdId',
+  dspUserId: 'dspUserId',
+  dspEventId: 'dspEventId',
+  jobKey: 'jobKey',
+  templateName: 'templateName',
+  advertiserKey: 'advertiserKey'
+};
+exports.fetchOptionsSponsoredJobLogging = {
+  credentials: 'include'
+};
+
+/***/ }),
+
+/***/ 1348:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports.getForcedAdId = void 0;
+function getForcedAdId(params) {
+  let forcedAdId = params.get('forcedAdId');
+  if (forcedAdId) {
+    const forcedAdIdNum = parseInt(forcedAdId, 10);
+    if (isNaN(forcedAdIdNum)) {
+      forcedAdId = null;
+    } else {
+      forcedAdId = forcedAdIdNum.toString();
+    }
+  }
+  return forcedAdId;
+}
+exports.getForcedAdId = getForcedAdId;
+
+/***/ }),
+
+/***/ 2604:
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports.createIndeedAdNotLoadEvent = exports.createIndeedAdLoadEvent = exports.trackCreativeKey = exports.setForcedId = exports.addPrforceGroupsData = void 0;
+const constants_1 = __webpack_require__(7504);
+const getForcedAdId_1 = __webpack_require__(1348);
+function addPrforceGroupsData(params) {
+  const prforceGroups = params.get('prforceGroups');
+  if (prforceGroups && validatePrforceGroups(prforceGroups)) {
+    const pubTagArray = Array.from(document.body.querySelectorAll(`[data-tag-type='publisher']:not([data-load-status])`));
+    pubTagArray.forEach(tag => {
+      tag.dataset.prforceGroups = prforceGroups;
+    });
+  }
+}
+exports.addPrforceGroupsData = addPrforceGroupsData;
+function setForcedId(pubTagArray, param) {
+  const forcedAdId = (0, getForcedAdId_1.getForcedAdId)(param);
+  if (forcedAdId) {
+    pubTagArray[0].dataset.forcedAdId = forcedAdId;
+  }
+}
+exports.setForcedId = setForcedId;
+function trackCreativeKey(jsonObj, pubTag, creativeKeySet) {
+  const creativeKey = jsonObj.creativeKey;
+  pubTag.dataset.creativeKey = creativeKey;
+  // Keep track of unique creativeKeys
+  if (creativeKeySet.has(creativeKey)) {
+    pubTag.dataset.creativeKeyDuplicate = 'true';
+    pubTag.dataset.loadStatus = constants_1.NOTLOADED;
+    pubTag.dispatchEvent(createIndeedAdNotLoadEvent());
+  } else {
+    creativeKeySet.add(creativeKey);
+    pubTag.dataset.creativeData = JSON.stringify(jsonObj);
+  }
+}
+exports.trackCreativeKey = trackCreativeKey;
+function createIndeedAdLoadEvent() {
+  return new CustomEvent('indeedAdLoaded');
+}
+exports.createIndeedAdLoadEvent = createIndeedAdLoadEvent;
+function createIndeedAdNotLoadEvent() {
+  return new CustomEvent('indeedAdNotLoaded');
+}
+exports.createIndeedAdNotLoadEvent = createIndeedAdNotLoadEvent;
+function validatePrforceGroups(prforceGroups) {
+  const groups = prforceGroups.split(',');
+  // validates that each group ends with a number that is -1 or greater
+  const validGroupRegEx = /(\D+\-1$)|[^\-\d](\d+$)/;
+  return groups.every(group => validGroupRegEx.test(group));
+}
+
+/***/ }),
+
+/***/ 1345:
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports.setTagReason = void 0;
+const constants_1 = __webpack_require__(7504);
+function setTagReason(publisherTag, reason) {
+  publisherTag.dataset.tagReason = reason;
+  publisherTag.dataset.loadStatus = constants_1.NOTLOADED;
+}
+exports.setTagReason = setTagReason;
+
+/***/ }),
+
+/***/ 4416:
+/***/ ((__unused_webpack_module, exports, __webpack_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+const constants_1 = __webpack_require__(7504);
+function startPublisher() {
+  const IPT = window.__IPT__;
+  if (IPT.hasPublisherTags()) {
+    IPT.start();
+  } else {
+    IPT.logger.warn(constants_1.FOUND_NO_PUBLISHER_TAGS);
+  }
+}
+exports["default"] = startPublisher;
+
+/***/ }),
+
+/***/ 3913:
+/***/ (function(__unused_webpack_module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+const IndeedCreativeTagObject_1 = __importDefault(__webpack_require__(210));
+const IndeedPublisherTagObject_1 = __importDefault(__webpack_require__(1087));
+const constants_1 = __webpack_require__(7504);
+const startPublisher_1 = __importDefault(__webpack_require__(4416));
+// Create __IPT__ and __ICT__ objects if they haven't been created before,
+// and only add event listeners once
+if (!(window.__IPT__ && window.__ICT__.start)) {
+  window.__IPT__ = new IndeedPublisherTagObject_1.default();
+  window.__ICT__ = new IndeedCreativeTagObject_1.default();
+  window.addEventListener('load', () => {
+    window.__IPT__.windowLoaded = true;
+  }, false);
+  // Add scroll listener to detect if creative has been seen
+  document.addEventListener('scroll', function () {
+    const ICT = window.__ICT__;
+    if (!ICT.isTicking()) {
+      window.setTimeout(() => {
+        ICT.checkForElementsInViewport();
+        ICT.setTicking(false);
+      }, constants_1.SCROLL_DEBOUNCER_TIMEOUT);
+      ICT.setTicking(true);
+    }
+  });
+  // Listen for postMessage from Brand Spotlight creative
+  window.addEventListener('message', event => {
+    const ICT = window.__ICT__;
+    let origin;
+    const presentationEndpoint = ({"NODE_ENV":"production"}).PRESENTATION_WEBAPP_ENDPOINT;
+    if (presentationEndpoint) {
+      const presentationURL = new URL(presentationEndpoint);
+      origin = presentationURL.origin;
+    }
+    if ((event.origin === origin || event.origin === window.location.origin) && event.data && event.data.creativeKey && typeof event.data.event === 'string') {
+      const theMessage = event.data.event;
+      const creativeKey = event.data.creativeKey;
+      const creativeVariantId = event.data.creativeVariantId;
+      const format = event.data.format;
+      const targetCreativeTagElement = document.querySelector(`[data-tag-type="creative"][data-creative-key="${creativeKey}"][data-flow-type="brand-spotlight"]`);
+      if (targetCreativeTagElement) {
+        if (theMessage === 'click') {
+          ICT.logCreativeClick(targetCreativeTagElement);
+        }
+        if (theMessage === 'close') {
+          ICT.logCreativeClosed(targetCreativeTagElement);
+          ICT.unregisterElementForSeenCheck(targetCreativeTagElement);
+          targetCreativeTagElement.remove();
+        }
+        if (theMessage === 'creative-rendered') {
+          if (creativeVariantId) {
+            targetCreativeTagElement.dataset.creativeVariantId = creativeVariantId;
+          }
+          if (format) {
+            targetCreativeTagElement.dataset.format = format;
+          }
+          ICT.registerElementForSeenCheck(targetCreativeTagElement);
+          ICT.checkForElementsInViewport();
+          targetCreativeTagElement.dataset.loadStatus = constants_1.LOADED;
+        }
+      }
+    }
+  }, false);
+}
+(0, startPublisher_1.default)();
+
+/***/ }),
+
+/***/ 9388:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({
+  value: true
+}));
+exports.FlowType = void 0;
+var FlowType;
+(function (FlowType) {
+  FlowType["INLINE"] = "inline";
+  FlowType["BRAND_SPOTLIGHT"] = "brand-spotlight";
+  FlowType["COMPANY_SPOTLIGHT"] = "company-spotlight";
+  FlowType["HOMEPAGE_HIGHLIGHT"] = "homepage-highlight";
+})(FlowType = exports.FlowType || (exports.FlowType = {}));
+
+/***/ }),
+
+/***/ 5666:
+/***/ ((module) => {
+
+/**
+ * Copyright (c) 2014-present, Facebook, Inc.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+var runtime = (function (exports) {
+  "use strict";
+
+  var Op = Object.prototype;
+  var hasOwn = Op.hasOwnProperty;
+  var defineProperty = Object.defineProperty || function (obj, key, desc) { obj[key] = desc.value; };
+  var undefined; // More compressible than void 0.
+  var $Symbol = typeof Symbol === "function" ? Symbol : {};
+  var iteratorSymbol = $Symbol.iterator || "@@iterator";
+  var asyncIteratorSymbol = $Symbol.asyncIterator || "@@asyncIterator";
+  var toStringTagSymbol = $Symbol.toStringTag || "@@toStringTag";
+
+  function define(obj, key, value) {
+    Object.defineProperty(obj, key, {
+      value: value,
+      enumerable: true,
+      configurable: true,
+      writable: true
+    });
+    return obj[key];
+  }
+  try {
+    // IE 8 has a broken Object.defineProperty that only works on DOM objects.
+    define({}, "");
+  } catch (err) {
+    define = function(obj, key, value) {
+      return obj[key] = value;
+    };
+  }
+
+  function wrap(innerFn, outerFn, self, tryLocsList) {
+    // If outerFn provided and outerFn.prototype is a Generator, then outerFn.prototype instanceof Generator.
+    var protoGenerator = outerFn && outerFn.prototype instanceof Generator ? outerFn : Generator;
+    var generator = Object.create(protoGenerator.prototype);
+    var context = new Context(tryLocsList || []);
+
+    // The ._invoke method unifies the implementations of the .next,
+    // .throw, and .return methods.
+    defineProperty(generator, "_invoke", { value: makeInvokeMethod(innerFn, self, context) });
+
+    return generator;
+  }
+  exports.wrap = wrap;
+
+  // Try/catch helper to minimize deoptimizations. Returns a completion
+  // record like context.tryEntries[i].completion. This interface could
+  // have been (and was previously) designed to take a closure to be
+  // invoked without arguments, but in all the cases we care about we
+  // already have an existing method we want to call, so there's no need
+  // to create a new function object. We can even get away with assuming
+  // the method takes exactly one argument, since that happens to be true
+  // in every case, so we don't have to touch the arguments object. The
+  // only additional allocation required is the completion record, which
+  // has a stable shape and so hopefully should be cheap to allocate.
+  function tryCatch(fn, obj, arg) {
+    try {
+      return { type: "normal", arg: fn.call(obj, arg) };
+    } catch (err) {
+      return { type: "throw", arg: err };
+    }
+  }
+
+  var GenStateSuspendedStart = "suspendedStart";
+  var GenStateSuspendedYield = "suspendedYield";
+  var GenStateExecuting = "executing";
+  var GenStateCompleted = "completed";
+
+  // Returning this object from the innerFn has the same effect as
+  // breaking out of the dispatch switch statement.
+  var ContinueSentinel = {};
+
+  // Dummy constructor functions that we use as the .constructor and
+  // .constructor.prototype properties for functions that return Generator
+  // objects. For full spec compliance, you may wish to configure your
+  // minifier not to mangle the names of these two functions.
+  function Generator() {}
+  function GeneratorFunction() {}
+  function GeneratorFunctionPrototype() {}
+
+  // This is a polyfill for %IteratorPrototype% for environments that
+  // don't natively support it.
+  var IteratorPrototype = {};
+  define(IteratorPrototype, iteratorSymbol, function () {
+    return this;
+  });
+
+  var getProto = Object.getPrototypeOf;
+  var NativeIteratorPrototype = getProto && getProto(getProto(values([])));
+  if (NativeIteratorPrototype &&
+      NativeIteratorPrototype !== Op &&
+      hasOwn.call(NativeIteratorPrototype, iteratorSymbol)) {
+    // This environment has a native %IteratorPrototype%; use it instead
+    // of the polyfill.
+    IteratorPrototype = NativeIteratorPrototype;
+  }
+
+  var Gp = GeneratorFunctionPrototype.prototype =
+    Generator.prototype = Object.create(IteratorPrototype);
+  GeneratorFunction.prototype = GeneratorFunctionPrototype;
+  defineProperty(Gp, "constructor", { value: GeneratorFunctionPrototype, configurable: true });
+  defineProperty(
+    GeneratorFunctionPrototype,
+    "constructor",
+    { value: GeneratorFunction, configurable: true }
+  );
+  GeneratorFunction.displayName = define(
+    GeneratorFunctionPrototype,
+    toStringTagSymbol,
+    "GeneratorFunction"
+  );
+
+  // Helper for defining the .next, .throw, and .return methods of the
+  // Iterator interface in terms of a single ._invoke method.
+  function defineIteratorMethods(prototype) {
+    ["next", "throw", "return"].forEach(function(method) {
+      define(prototype, method, function(arg) {
+        return this._invoke(method, arg);
+      });
+    });
+  }
+
+  exports.isGeneratorFunction = function(genFun) {
+    var ctor = typeof genFun === "function" && genFun.constructor;
+    return ctor
+      ? ctor === GeneratorFunction ||
+        // For the native GeneratorFunction constructor, the best we can
+        // do is to check its .name property.
+        (ctor.displayName || ctor.name) === "GeneratorFunction"
+      : false;
+  };
+
+  exports.mark = function(genFun) {
+    if (Object.setPrototypeOf) {
+      Object.setPrototypeOf(genFun, GeneratorFunctionPrototype);
+    } else {
+      genFun.__proto__ = GeneratorFunctionPrototype;
+      define(genFun, toStringTagSymbol, "GeneratorFunction");
+    }
+    genFun.prototype = Object.create(Gp);
+    return genFun;
+  };
+
+  // Within the body of any async function, `await x` is transformed to
+  // `yield regeneratorRuntime.awrap(x)`, so that the runtime can test
+  // `hasOwn.call(value, "__await")` to determine if the yielded value is
+  // meant to be awaited.
+  exports.awrap = function(arg) {
+    return { __await: arg };
+  };
+
+  function AsyncIterator(generator, PromiseImpl) {
+    function invoke(method, arg, resolve, reject) {
+      var record = tryCatch(generator[method], generator, arg);
+      if (record.type === "throw") {
+        reject(record.arg);
+      } else {
+        var result = record.arg;
+        var value = result.value;
+        if (value &&
+            typeof value === "object" &&
+            hasOwn.call(value, "__await")) {
+          return PromiseImpl.resolve(value.__await).then(function(value) {
+            invoke("next", value, resolve, reject);
+          }, function(err) {
+            invoke("throw", err, resolve, reject);
+          });
+        }
+
+        return PromiseImpl.resolve(value).then(function(unwrapped) {
+          // When a yielded Promise is resolved, its final value becomes
+          // the .value of the Promise<{value,done}> result for the
+          // current iteration.
+          result.value = unwrapped;
+          resolve(result);
+        }, function(error) {
+          // If a rejected Promise was yielded, throw the rejection back
+          // into the async generator function so it can be handled there.
+          return invoke("throw", error, resolve, reject);
+        });
+      }
+    }
+
+    var previousPromise;
+
+    function enqueue(method, arg) {
+      function callInvokeWithMethodAndArg() {
+        return new PromiseImpl(function(resolve, reject) {
+          invoke(method, arg, resolve, reject);
+        });
+      }
+
+      return previousPromise =
+        // If enqueue has been called before, then we want to wait until
+        // all previous Promises have been resolved before calling invoke,
+        // so that results are always delivered in the correct order. If
+        // enqueue has not been called before, then it is important to
+        // call invoke immediately, without waiting on a callback to fire,
+        // so that the async generator function has the opportunity to do
+        // any necessary setup in a predictable way. This predictability
+        // is why the Promise constructor synchronously invokes its
+        // executor callback, and why async functions synchronously
+        // execute code before the first await. Since we implement simple
+        // async functions in terms of async generators, it is especially
+        // important to get this right, even though it requires care.
+        previousPromise ? previousPromise.then(
+          callInvokeWithMethodAndArg,
+          // Avoid propagating failures to Promises returned by later
+          // invocations of the iterator.
+          callInvokeWithMethodAndArg
+        ) : callInvokeWithMethodAndArg();
+    }
+
+    // Define the unified helper method that is used to implement .next,
+    // .throw, and .return (see defineIteratorMethods).
+    defineProperty(this, "_invoke", { value: enqueue });
+  }
+
+  defineIteratorMethods(AsyncIterator.prototype);
+  define(AsyncIterator.prototype, asyncIteratorSymbol, function () {
+    return this;
+  });
+  exports.AsyncIterator = AsyncIterator;
+
+  // Note that simple async functions are implemented on top of
+  // AsyncIterator objects; they just return a Promise for the value of
+  // the final result produced by the iterator.
+  exports.async = function(innerFn, outerFn, self, tryLocsList, PromiseImpl) {
+    if (PromiseImpl === void 0) PromiseImpl = Promise;
+
+    var iter = new AsyncIterator(
+      wrap(innerFn, outerFn, self, tryLocsList),
+      PromiseImpl
+    );
+
+    return exports.isGeneratorFunction(outerFn)
+      ? iter // If outerFn is a generator, return the full iterator.
+      : iter.next().then(function(result) {
+          return result.done ? result.value : iter.next();
+        });
+  };
+
+  function makeInvokeMethod(innerFn, self, context) {
+    var state = GenStateSuspendedStart;
+
+    return function invoke(method, arg) {
+      if (state === GenStateExecuting) {
+        throw new Error("Generator is already running");
+      }
+
+      if (state === GenStateCompleted) {
+        if (method === "throw") {
+          throw arg;
+        }
+
+        // Be forgiving, per 25.3.3.3.3 of the spec:
+        // https://people.mozilla.org/~jorendorff/es6-draft.html#sec-generatorresume
+        return doneResult();
+      }
+
+      context.method = method;
+      context.arg = arg;
+
+      while (true) {
+        var delegate = context.delegate;
+        if (delegate) {
+          var delegateResult = maybeInvokeDelegate(delegate, context);
+          if (delegateResult) {
+            if (delegateResult === ContinueSentinel) continue;
+            return delegateResult;
+          }
+        }
+
+        if (context.method === "next") {
+          // Setting context._sent for legacy support of Babel's
+          // function.sent implementation.
+          context.sent = context._sent = context.arg;
+
+        } else if (context.method === "throw") {
+          if (state === GenStateSuspendedStart) {
+            state = GenStateCompleted;
+            throw context.arg;
+          }
+
+          context.dispatchException(context.arg);
+
+        } else if (context.method === "return") {
+          context.abrupt("return", context.arg);
+        }
+
+        state = GenStateExecuting;
+
+        var record = tryCatch(innerFn, self, context);
+        if (record.type === "normal") {
+          // If an exception is thrown from innerFn, we leave state ===
+          // GenStateExecuting and loop back for another invocation.
+          state = context.done
+            ? GenStateCompleted
+            : GenStateSuspendedYield;
+
+          if (record.arg === ContinueSentinel) {
+            continue;
+          }
+
+          return {
+            value: record.arg,
+            done: context.done
+          };
+
+        } else if (record.type === "throw") {
+          state = GenStateCompleted;
+          // Dispatch the exception by looping back around to the
+          // context.dispatchException(context.arg) call above.
+          context.method = "throw";
+          context.arg = record.arg;
+        }
+      }
+    };
+  }
+
+  // Call delegate.iterator[context.method](context.arg) and handle the
+  // result, either by returning a { value, done } result from the
+  // delegate iterator, or by modifying context.method and context.arg,
+  // setting context.delegate to null, and returning the ContinueSentinel.
+  function maybeInvokeDelegate(delegate, context) {
+    var methodName = context.method;
+    var method = delegate.iterator[methodName];
+    if (method === undefined) {
+      // A .throw or .return when the delegate iterator has no .throw
+      // method, or a missing .next mehtod, always terminate the
+      // yield* loop.
+      context.delegate = null;
+
+      // Note: ["return"] must be used for ES3 parsing compatibility.
+      if (methodName === "throw" && delegate.iterator["return"]) {
+        // If the delegate iterator has a return method, give it a
+        // chance to clean up.
+        context.method = "return";
+        context.arg = undefined;
+        maybeInvokeDelegate(delegate, context);
+
+        if (context.method === "throw") {
+          // If maybeInvokeDelegate(context) changed context.method from
+          // "return" to "throw", let that override the TypeError below.
+          return ContinueSentinel;
+        }
+      }
+      if (methodName !== "return") {
+        context.method = "throw";
+        context.arg = new TypeError(
+          "The iterator does not provide a '" + methodName + "' method");
+      }
+
+      return ContinueSentinel;
+    }
+
+    var record = tryCatch(method, delegate.iterator, context.arg);
+
+    if (record.type === "throw") {
+      context.method = "throw";
+      context.arg = record.arg;
+      context.delegate = null;
+      return ContinueSentinel;
+    }
+
+    var info = record.arg;
+
+    if (! info) {
+      context.method = "throw";
+      context.arg = new TypeError("iterator result is not an object");
+      context.delegate = null;
+      return ContinueSentinel;
+    }
+
+    if (info.done) {
+      // Assign the result of the finished delegate to the temporary
+      // variable specified by delegate.resultName (see delegateYield).
+      context[delegate.resultName] = info.value;
+
+      // Resume execution at the desired location (see delegateYield).
+      context.next = delegate.nextLoc;
+
+      // If context.method was "throw" but the delegate handled the
+      // exception, let the outer generator proceed normally. If
+      // context.method was "next", forget context.arg since it has been
+      // "consumed" by the delegate iterator. If context.method was
+      // "return", allow the original .return call to continue in the
+      // outer generator.
+      if (context.method !== "return") {
+        context.method = "next";
+        context.arg = undefined;
+      }
+
+    } else {
+      // Re-yield the result returned by the delegate method.
+      return info;
+    }
+
+    // The delegate iterator is finished, so forget it and continue with
+    // the outer generator.
+    context.delegate = null;
+    return ContinueSentinel;
+  }
+
+  // Define Generator.prototype.{next,throw,return} in terms of the
+  // unified ._invoke helper method.
+  defineIteratorMethods(Gp);
+
+  define(Gp, toStringTagSymbol, "Generator");
+
+  // A Generator should always return itself as the iterator object when the
+  // @@iterator function is called on it. Some browsers' implementations of the
+  // iterator prototype chain incorrectly implement this, causing the Generator
+  // object to not be returned from this call. This ensures that doesn't happen.
+  // See https://github.com/facebook/regenerator/issues/274 for more details.
+  define(Gp, iteratorSymbol, function() {
+    return this;
+  });
+
+  define(Gp, "toString", function() {
+    return "[object Generator]";
+  });
+
+  function pushTryEntry(locs) {
+    var entry = { tryLoc: locs[0] };
+
+    if (1 in locs) {
+      entry.catchLoc = locs[1];
+    }
+
+    if (2 in locs) {
+      entry.finallyLoc = locs[2];
+      entry.afterLoc = locs[3];
+    }
+
+    this.tryEntries.push(entry);
+  }
+
+  function resetTryEntry(entry) {
+    var record = entry.completion || {};
+    record.type = "normal";
+    delete record.arg;
+    entry.completion = record;
+  }
+
+  function Context(tryLocsList) {
+    // The root entry object (effectively a try statement without a catch
+    // or a finally block) gives us a place to store values thrown from
+    // locations where there is no enclosing try statement.
+    this.tryEntries = [{ tryLoc: "root" }];
+    tryLocsList.forEach(pushTryEntry, this);
+    this.reset(true);
+  }
+
+  exports.keys = function(val) {
+    var object = Object(val);
+    var keys = [];
+    for (var key in object) {
+      keys.push(key);
+    }
+    keys.reverse();
+
+    // Rather than returning an object with a next method, we keep
+    // things simple and return the next function itself.
+    return function next() {
+      while (keys.length) {
+        var key = keys.pop();
+        if (key in object) {
+          next.value = key;
+          next.done = false;
+          return next;
+        }
+      }
+
+      // To avoid creating an additional object, we just hang the .value
+      // and .done properties off the next function object itself. This
+      // also ensures that the minifier will not anonymize the function.
+      next.done = true;
+      return next;
+    };
+  };
+
+  function values(iterable) {
+    if (iterable) {
+      var iteratorMethod = iterable[iteratorSymbol];
+      if (iteratorMethod) {
+        return iteratorMethod.call(iterable);
+      }
+
+      if (typeof iterable.next === "function") {
+        return iterable;
+      }
+
+      if (!isNaN(iterable.length)) {
+        var i = -1, next = function next() {
+          while (++i < iterable.length) {
+            if (hasOwn.call(iterable, i)) {
+              next.value = iterable[i];
+              next.done = false;
+              return next;
+            }
+          }
+
+          next.value = undefined;
+          next.done = true;
+
+          return next;
+        };
+
+        return next.next = next;
+      }
+    }
+
+    // Return an iterator with no values.
+    return { next: doneResult };
+  }
+  exports.values = values;
+
+  function doneResult() {
+    return { value: undefined, done: true };
+  }
+
+  Context.prototype = {
+    constructor: Context,
+
+    reset: function(skipTempReset) {
+      this.prev = 0;
+      this.next = 0;
+      // Resetting context._sent for legacy support of Babel's
+      // function.sent implementation.
+      this.sent = this._sent = undefined;
+      this.done = false;
+      this.delegate = null;
+
+      this.method = "next";
+      this.arg = undefined;
+
+      this.tryEntries.forEach(resetTryEntry);
+
+      if (!skipTempReset) {
+        for (var name in this) {
+          // Not sure about the optimal order of these conditions:
+          if (name.charAt(0) === "t" &&
+              hasOwn.call(this, name) &&
+              !isNaN(+name.slice(1))) {
+            this[name] = undefined;
+          }
+        }
+      }
+    },
+
+    stop: function() {
+      this.done = true;
+
+      var rootEntry = this.tryEntries[0];
+      var rootRecord = rootEntry.completion;
+      if (rootRecord.type === "throw") {
+        throw rootRecord.arg;
+      }
+
+      return this.rval;
+    },
+
+    dispatchException: function(exception) {
+      if (this.done) {
+        throw exception;
+      }
+
+      var context = this;
+      function handle(loc, caught) {
+        record.type = "throw";
+        record.arg = exception;
+        context.next = loc;
+
+        if (caught) {
+          // If the dispatched exception was caught by a catch block,
+          // then let that catch block handle the exception normally.
+          context.method = "next";
+          context.arg = undefined;
+        }
+
+        return !! caught;
+      }
+
+      for (var i = this.tryEntries.length - 1; i >= 0; --i) {
+        var entry = this.tryEntries[i];
+        var record = entry.completion;
+
+        if (entry.tryLoc === "root") {
+          // Exception thrown outside of any try block that could handle
+          // it, so set the completion value of the entire function to
+          // throw the exception.
+          return handle("end");
+        }
+
+        if (entry.tryLoc <= this.prev) {
+          var hasCatch = hasOwn.call(entry, "catchLoc");
+          var hasFinally = hasOwn.call(entry, "finallyLoc");
+
+          if (hasCatch && hasFinally) {
+            if (this.prev < entry.catchLoc) {
+              return handle(entry.catchLoc, true);
+            } else if (this.prev < entry.finallyLoc) {
+              return handle(entry.finallyLoc);
+            }
+
+          } else if (hasCatch) {
+            if (this.prev < entry.catchLoc) {
+              return handle(entry.catchLoc, true);
+            }
+
+          } else if (hasFinally) {
+            if (this.prev < entry.finallyLoc) {
+              return handle(entry.finallyLoc);
+            }
+
+          } else {
+            throw new Error("try statement without catch or finally");
+          }
+        }
+      }
+    },
+
+    abrupt: function(type, arg) {
+      for (var i = this.tryEntries.length - 1; i >= 0; --i) {
+        var entry = this.tryEntries[i];
+        if (entry.tryLoc <= this.prev &&
+            hasOwn.call(entry, "finallyLoc") &&
+            this.prev < entry.finallyLoc) {
+          var finallyEntry = entry;
+          break;
+        }
+      }
+
+      if (finallyEntry &&
+          (type === "break" ||
+           type === "continue") &&
+          finallyEntry.tryLoc <= arg &&
+          arg <= finallyEntry.finallyLoc) {
+        // Ignore the finally entry if control is not jumping to a
+        // location outside the try/catch block.
+        finallyEntry = null;
+      }
+
+      var record = finallyEntry ? finallyEntry.completion : {};
+      record.type = type;
+      record.arg = arg;
+
+      if (finallyEntry) {
+        this.method = "next";
+        this.next = finallyEntry.finallyLoc;
+        return ContinueSentinel;
+      }
+
+      return this.complete(record);
+    },
+
+    complete: function(record, afterLoc) {
+      if (record.type === "throw") {
+        throw record.arg;
+      }
+
+      if (record.type === "break" ||
+          record.type === "continue") {
+        this.next = record.arg;
+      } else if (record.type === "return") {
+        this.rval = this.arg = record.arg;
+        this.method = "return";
+        this.next = "end";
+      } else if (record.type === "normal" && afterLoc) {
+        this.next = afterLoc;
+      }
+
+      return ContinueSentinel;
+    },
+
+    finish: function(finallyLoc) {
+      for (var i = this.tryEntries.length - 1; i >= 0; --i) {
+        var entry = this.tryEntries[i];
+        if (entry.finallyLoc === finallyLoc) {
+          this.complete(entry.completion, entry.afterLoc);
+          resetTryEntry(entry);
+          return ContinueSentinel;
+        }
+      }
+    },
+
+    "catch": function(tryLoc) {
+      for (var i = this.tryEntries.length - 1; i >= 0; --i) {
+        var entry = this.tryEntries[i];
+        if (entry.tryLoc === tryLoc) {
+          var record = entry.completion;
+          if (record.type === "throw") {
+            var thrown = record.arg;
+            resetTryEntry(entry);
+          }
+          return thrown;
+        }
+      }
+
+      // The context.catch method must only be called with a location
+      // argument that corresponds to a known catch block.
+      throw new Error("illegal catch attempt");
+    },
+
+    delegateYield: function(iterable, resultName, nextLoc) {
+      this.delegate = {
+        iterator: values(iterable),
+        resultName: resultName,
+        nextLoc: nextLoc
+      };
+
+      if (this.method === "next") {
+        // Deliberately forget the last sent value so that we don't
+        // accidentally pass it on to the delegate.
+        this.arg = undefined;
+      }
+
+      return ContinueSentinel;
+    }
+  };
+
+  // Regardless of whether this script is executing as a CommonJS module
+  // or not, return the runtime object so that we can declare the variable
+  // regeneratorRuntime in the outer scope, which allows this module to be
+  // injected easily by `bin/regenerator --include-runtime script.js`.
+  return exports;
+
+}(
+  // If this script is executing as a CommonJS module, use module.exports
+  // as the regeneratorRuntime namespace. Otherwise create a new empty
+  // object. Either way, the resulting object will be used to initialize
+  // the regeneratorRuntime variable at the top of this file.
+   true ? module.exports : 0
+));
+
+try {
+  regeneratorRuntime = runtime;
+} catch (accidentalStrictMode) {
+  // This module should not be running in strict mode, so the above
+  // assignment should always work unless something is misconfigured. Just
+  // in case runtime.js accidentally runs in strict mode, in modern engines
+  // we can explicitly access globalThis. In older engines we can escape
+  // strict mode using a global Function call. This could conceivably fail
+  // if a Content Security Policy forbids using Function, but in that case
+  // the proper solution is to fix the accidental strict mode problem. If
+  // you've misconfigured your bundler to force strict mode and applied a
+  // CSP to forbid Function, and you're not willing to fix either of those
+  // problems, please detail your unique predicament in a GitHub issue.
+  if (typeof globalThis === "object") {
+    globalThis.regeneratorRuntime = runtime;
+  } else {
+    Function("r", "regeneratorRuntime = r")(runtime);
+  }
+}
+
+
+/***/ })
+
+/******/ 	});
+/************************************************************************/
+/******/ 	// The module cache
+/******/ 	var __webpack_module_cache__ = {};
+/******/ 	
+/******/ 	// The require function
+/******/ 	function __webpack_require__(moduleId) {
+/******/ 		// Check if module is in cache
+/******/ 		var cachedModule = __webpack_module_cache__[moduleId];
+/******/ 		if (cachedModule !== undefined) {
+/******/ 			return cachedModule.exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = __webpack_module_cache__[moduleId] = {
+/******/ 			// no module.id needed
+/******/ 			// no module.loaded needed
+/******/ 			exports: {}
+/******/ 		};
+/******/ 	
+/******/ 		// Execute the module function
+/******/ 		__webpack_modules__[moduleId].call(module.exports, module, module.exports, __webpack_require__);
+/******/ 	
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+/******/ 	
+/************************************************************************/
+/******/ 	
+/******/ 	// startup
+/******/ 	// Load entry module and return exports
+/******/ 	// This entry module is referenced by other modules so it can't be inlined
+/******/ 	var __webpack_exports__ = __webpack_require__(3913);
+/******/ 	
+/******/ })()
+;
+//# sourceMappingURL=publisherTag.js.map
