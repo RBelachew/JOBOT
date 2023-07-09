@@ -1,0 +1,88 @@
+.pedigree-tree {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  
+  .pedigree-tree li {
+    position: relative;
+    padding-left: 1.5em;
+    margin-bottom: 1em;
+  }
+  
+  .pedigree-tree li:before {
+    content: "";
+    position: absolute;
+    top: 0.5em;
+    left: -1em;
+    width: 1em;
+    height: 0.5em;
+    border-top: 2px solid black;
+    border-left: 2px solid black;
+  }
+  
+  .pedigree-tree li:after {
+    content: "";
+    position: absolute;
+    top: 0.5em;
+    left: -0.5em;
+    width: 0.5em;
+    height: 100%;
+    border-left: 2px solid black;
+  }
+  
+  .pedigree-tree li:first-child:before {
+    border-left: none;
+  }
+  
+  .pedigree-tree li:last-child:after {
+    height: 0.5em;
+  }
+  
+  .text-content {
+    display: inline-block;
+    background-color: #fff;;
+    padding: 0.5em;
+    border: 2px solid black;
+    border-radius: 5px;
+    text-align: center;
+    position: relative;
+    height: 25px;
+  }
+  
+  .description {
+    background-color: #d3d1d3c0;
+    border: none;
+    outline: none;
+    font-family: 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
+    font-size: 15px;
+    border-radius: 5px;
+    display: inline;
+    height: 18px;
+  }
+  
+  .vertix{
+    background-color: #f8eac2c0;
+    border-radius: 5px;
+    display: inline;
+    height: 18px;
+  }
+
+  .expand-button{
+    margin-top: 10px;
+    margin-left: 10px;
+    margin-right: 10px;
+    padding: 5px 10px;
+    border-radius: 4px;
+    background-color: #b2e6f7;
+    color: rgb(66, 17, 68);
+    border: none;
+    cursor: pointer;
+    border-radius: 500px;
+    display: inline;
+  }
+
+  .export-button{
+    margin-left: 20px;
+  }
+  

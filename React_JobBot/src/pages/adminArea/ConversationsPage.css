@@ -1,0 +1,40 @@
+.conversations-page {
+    margin: 20px;
+  }
+  
+  .history-item {
+    background-color: #f5f5f5;
+    padding: 20px;
+    border-radius: 5px;
+    white-space: pre-wrap;
+    font-family: 'Courier New', Courier, monospace;
+  }
+  
+  .pre {
+    background-color: #f5f5f5;
+    border-radius: 5px;
+    padding: 10px;
+    font-family: monospace;
+    font-size: 14px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  
+  .message-item {
+    margin-bottom: 10px;
+  }
+  
+  .message {
+    display: flex;
+    align-items: center;
+  }
+  
+  .role {
+    font-weight: bold;
+    margin-right: 5px;
+  }
+  
+  .content {
+    word-break: break-word;
+  }
+  

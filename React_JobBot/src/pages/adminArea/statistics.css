@@ -1,0 +1,49 @@
+.alldata{
+    top: 0;
+    margin: auto;
+    width: 50%;
+    padding: 10px;
+
+}
+
+.wrapper{
+    display:grid;
+    grid-template-columns: 50% 50%;
+    grid-gap: 1em;
+    grid-auto-rows: 300px;
+}
+
+.wrapper > p{
+    padding: 1em;
+}
+
+.date,.number{
+    display: inline-block;
+    padding: 1em;
+}
+
+button{
+    background-color:cyan;
+}
+
+.feedbacPie{
+width: 450px;
+margin: auto;
+padding: 10px;
+
+}
+
+.update-button{
+    background-color: #EAF1FF;
+    border-color:  #F1F6F9;;
+    margin-right: 200px;
+    margin-top: -20px;
+}
+.update-button:hover{
+    background-color: #F1F6F9;
+}
+
+.sentence{
+    text-align: center;
+    font-size: 16px;
+}
