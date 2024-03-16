@@ -5,7 +5,7 @@ Architecture of JOBOT:
 
 ![image](https://github.com/RBelachew/JOBOT/assets/49268743/056eb976-d4bc-435f-b0e7-82e7c745f4c0)
 
-JOBOT in action:
+Screenshots from the app:
 
 ![image](https://github.com/RBelachew/JOBOT/assets/49268743/b1b00aae-acf8-46df-87b1-2e8aeab0e371)
 
